@@ -15,8 +15,6 @@ A backend system for managing Paying Guest (PG) accommodations, handling room bo
 
 ---
 
-
-
 ## 2. Technology Stack
 
 ### 2.1 Framework & Runtime
