@@ -25,7 +25,17 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = Field(None, max_length=100)
+    password: Optional[str] = Field(None, min_length=6)
+    role: Optional[str] = None
     is_active: Optional[bool] = None
+
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v):
+        """Validate role is either 'admin' or 'user'."""
+        if v is not None and v not in ["admin", "user"]:
+            raise ValueError("Role must be either 'admin' or 'user'")
+        return v
 
 
 class UserResponse(UserBase):

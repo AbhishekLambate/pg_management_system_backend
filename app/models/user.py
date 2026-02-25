@@ -12,12 +12,8 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=True)
     role = Column(String(20), default="user", nullable=False)  # 'admin' or 'user'
+    is_admin = Column(Boolean, default=False, nullable=False)   # derived from role
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    @property
-    def is_admin(self) -> bool:
-        """Check if user is admin based on role."""
-        return self.role == "admin"
 

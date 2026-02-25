@@ -40,6 +40,7 @@ class UserRepository(IUserRepository):
             hashed_password=entity.hashed_password,
             full_name=entity.full_name,
             role=entity.role,
+            is_admin=entity.role == "admin",  # keep in sync with role
             is_active=entity.is_active
         )
     

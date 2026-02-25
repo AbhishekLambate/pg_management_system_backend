@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.user import UserCreate, UserResponse, UserLogin, Token
+from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserLogin, Token
 from app.repositories.user_repository import UserRepository
 from app.usecases.auth_usecase import (
     RegisterUserUseCase,
     LoginUseCase,
     GetUserUseCase,
-    GetAllUsersUseCase
+    GetAllUsersUseCase,
+    UpdateUserUseCase,
+    DeleteUserUseCase
 )
 from app.utils.dependencies import get_current_user
 from app.models.user import User
@@ -172,4 +174,70 @@ def get_user(
         created_at=user_entity.created_at,
         updated_at=user_entity.updated_at
     )
+
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    update_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    repository: UserRepository = Depends(get_user_repository)
+):
+    """
+    Update a user by ID.
+
+    - Admin can update any user including their role.
+    - Regular users can only update their own profile (email, full_name, password).
+    - Role change is restricted to admins only.
+    """
+    # Non-admins can only update their own profile
+    if not current_user.is_admin and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to update this user"
+        )
+
+    # Only admins can change roles
+    if update_data.role is not None and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can change user roles"
+        )
+
+    use_case = UpdateUserUseCase(repository)
+    updated_user = use_case.execute(user_id, update_data)
+
+    return UserResponse(
+        id=updated_user.id,
+        username=updated_user.username,
+        email=updated_user.email,
+        full_name=updated_user.full_name,
+        role=updated_user.role,
+        is_active=updated_user.is_active,
+        created_at=updated_user.created_at,
+        updated_at=updated_user.updated_at
+    )
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    repository: UserRepository = Depends(get_user_repository)
+):
+    """
+    Delete a user by ID (admin only).
+
+    Returns 204 No Content on success.
+    Returns 403 if the caller is not an admin.
+    Returns 404 if the user does not exist.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can delete users"
+        )
+
+    use_case = DeleteUserUseCase(repository)
+    use_case.execute(user_id)
 

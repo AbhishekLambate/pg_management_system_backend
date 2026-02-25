@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
 from app.handlers import auth_handler
+from app.handlers import location_handler, building_handler, room_handler, tenant_handler
+# Import models so SQLAlchemy creates all tables
+from app.models import user, location, building, room, tenant  # noqa: F401
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -25,6 +28,10 @@ app.add_middleware(
 
 # Include handlers
 app.include_router(auth_handler.router)
+app.include_router(location_handler.router)
+app.include_router(building_handler.router)
+app.include_router(room_handler.router)
+app.include_router(tenant_handler.router)
 
 
 @app.get("/")

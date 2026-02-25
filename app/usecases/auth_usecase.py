@@ -153,3 +153,61 @@ class GetAllUsersUseCase:
         """Execute get all users."""
         return self.user_repository.get_all()
 
+
+class UpdateUserUseCase:
+    """
+    Update User Use Case - Chef (cooks the meal, follows recipe).
+
+    The Chef updates a user's details using the kitchen equipment (Repository)
+    following the recipe (Interface contract). Only the fields provided are updated.
+    """
+
+    def __init__(self, user_repository: IUserRepository):
+        self.user_repository = user_repository
+
+    def execute(self, user_id: int, update_data) -> "UserEntity":
+        """Execute update user by ID (partial update)."""
+        from app.schemas.user import UserUpdate
+
+        user = self.user_repository.get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Apply only provided fields
+        if update_data.email is not None:
+            user.email = update_data.email
+        if update_data.full_name is not None:
+            user.full_name = update_data.full_name
+        if update_data.is_active is not None:
+            user.is_active = update_data.is_active
+        if update_data.role is not None:
+            user.role = update_data.role
+        if update_data.password is not None:
+            user.hashed_password = get_password_hash(update_data.password)
+
+        return self.user_repository.update(user)
+
+
+class DeleteUserUseCase:
+    """
+    Delete User Use Case - Chef (cooks the meal, follows recipe).
+
+    The Chef deletes a user using the kitchen equipment (Repository)
+    following the recipe (Interface contract).
+    """
+
+    def __init__(self, user_repository: IUserRepository):
+        self.user_repository = user_repository
+
+    def execute(self, user_id: int) -> bool:
+        """Execute delete user by ID."""
+        user = self.user_repository.get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        return self.user_repository.delete(user_id)
