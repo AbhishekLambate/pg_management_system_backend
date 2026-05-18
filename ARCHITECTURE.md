@@ -1,12 +1,16 @@
 # PG Management System - Architecture Document
 
+Complete architecture documentation for the PG Management System backend.
+
+---
+
 ## 1. System Overview
 
 ### 1.1 Purpose
 A backend system for managing Paying Guest (PG) accommodations, handling room bookings, tenant management, payments, and administrative operations.
 
 ### 1.2 Core Features
-- **User Management**: Admin and staff authentication/authorization
+- **User Management**: Role-based authentication/authorization (admin/user)
 - **Room Management**: CRUD operations for rooms, availability tracking
 - **Tenant Management**: Tenant profiles, contact information, ID verification
 - **Booking Management**: Room bookings, check-in/check-out, occupancy tracking
@@ -24,13 +28,15 @@ A backend system for managing Paying Guest (PG) accommodations, handling room bo
 
 ### 2.2 Database
 - **ORM**: SQLAlchemy 2.0
-- **Database**: PostgreSQL (recommended) or SQLite (for development)
+- **Database**: MySQL (recommended) or SQLite (for development)
+- **Driver**: PyMySQL
 - **Migrations**: Alembic
 
 ### 2.3 Authentication & Security
 - **JWT**: python-jose for token generation/validation
 - **Password Hashing**: passlib with bcrypt
 - **CORS**: FastAPI CORS middleware
+- **Email Validation**: email-validator
 
 ### 2.4 Additional Libraries
 - **Environment Variables**: python-dotenv, pydantic-settings
@@ -39,53 +45,87 @@ A backend system for managing Paying Guest (PG) accommodations, handling room bo
 
 ---
 
-## 3. Project Structure
+## 3. Architecture Pattern: Clean Architecture
+
+The project follows **Clean Architecture** with clear separation of concerns using a restaurant analogy:
+
+- **Handler** = Waiter (takes order, serves food)
+- **UseCase** = Chef (cooks the meal, follows recipe)
+- **Repository** = Kitchen equipment (tools to get/store ingredients)
+- **Interface** = Recipe card (defines what tools are needed)
+- **Entity** = Ingredients (data structures)
+
+### 3.1 Architecture Layers
 
 ```
-pg_management_backend/
+┌─────────────────────────────────────────────────────────────┐
+│                        Handlers                              │
+│              (API Endpoints / HTTP Layer)                    │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│                       Use Cases                              │
+│              (Business Logic / Application Rules)             │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│                   Repository Interfaces                      │
+│              (Contracts / Abstractions)                       │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│                  Repository Implementations                  │
+│              (Data Access Layer)                              │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│                      Database                                │
+│              (MySQL / SQLAlchemy)                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Project Structure
+
+```
+pg_management_system_backend/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py                 # FastAPI application entry point
 │   ├── config.py              # Configuration settings
 │   ├── database.py            # Database connection & session management
 │   │
-│   ├── models/                # SQLAlchemy database models
+│   ├── entities/              # Domain entities (pure business logic)
 │   │   ├── __init__.py
-│   │   ├── user.py           # User/Admin model
-│   │   ├── room.py           # Room model
-│   │   ├── tenant.py         # Tenant model
-│   │   ├── booking.py        # Booking model
-│   │   └── payment.py        # Payment model
+│   │   └── user.py           # User domain entity
 │   │
-│   ├── schemas/               # Pydantic schemas for request/response validation
-│   │   ├── __init__.py
-│   │   ├── user.py
-│   │   ├── room.py
-│   │   ├── tenant.py
-│   │   ├── booking.py
-│   │   └── payment.py
+│   ├── repositories/          # Data access layer
+│   │   ├── interfaces/        # Repository interfaces (contracts)
+│   │   │   ├── __init__.py
+│   │   │   └── user_repository_interface.py
+│   │   └── user_repository.py # SQLAlchemy implementation
 │   │
-│   ├── routers/               # API route handlers
+│   ├── usecases/              # Business logic / Use cases
 │   │   ├── __init__.py
-│   │   ├── auth.py           # Authentication routes
-│   │   ├── rooms.py           # Room management routes
-│   │   ├── tenants.py         # Tenant management routes
-│   │   ├── bookings.py        # Booking management routes
-│   │   └── payments.py        # Payment management routes
+│   │   └── auth_usecase.py   # Authentication use cases
 │   │
-│   ├── services/              # Business logic layer
+│   ├── handlers/              # API route handlers
 │   │   ├── __init__.py
-│   │   ├── auth_service.py   # Authentication logic
-│   │   ├── room_service.py   # Room business logic
-│   │   ├── tenant_service.py # Tenant business logic
-│   │   ├── booking_service.py # Booking business logic
-│   │   └── payment_service.py # Payment business logic
+│   │   └── auth_handler.py   # Authentication endpoints
+│   │
+│   ├── models/                # SQLAlchemy ORM models (database layer)
+│   │   ├── __init__.py
+│   │   └── user.py           # User database model
+│   │
+│   ├── schemas/               # Pydantic schemas (request/response validation)
+│   │   ├── __init__.py
+│   │   └── user.py           # User schemas
 │   │
 │   ├── utils/                 # Utility functions
 │   │   ├── __init__.py
 │   │   ├── security.py       # Password hashing, JWT tokens
-│   │   ├── dependencies.py   # FastAPI dependencies
-│   │   └── validators.py     # Custom validators
+│   │   └── dependencies.py   # FastAPI dependencies
 │   │
 │   └── middleware/            # Custom middleware (if needed)
 │       └── __init__.py
@@ -95,166 +135,247 @@ pg_management_backend/
 │   └── env.py
 │
 ├── tests/                      # Test files
-│   ├── __init__.py
-│   ├── test_auth.py
-│   ├── test_rooms.py
-│   ├── test_tenants.py
-│   └── ...
+│   └── __init__.py
 │
-├── .env                        # Environment variables (not in git)
-├── .env.example               # Example environment variables
-├── .gitignore
+├── .env                        # Environment variables
 ├── requirements.txt           # Python dependencies
-├── alembic.ini                # Alembic configuration
-├── README.md
-└── ARCHITECTURE.md            # This file
+├── run.py                     # Application runner
+└── README.md                  # Project documentation
 ```
 
 ---
 
-## 4. Database Schema Design
+## 5. Layer Descriptions
 
-### 4.1 Entity Relationship Diagram
+### 5.1 Entities (`app/entities/`)
+**Purpose**: Pure domain models with business logic (Ingredients)
 
-```
-┌─────────────┐         ┌──────────────┐         ┌─────────────┐
-│    User     │         │    Tenant    │         │    Room     │
-│─────────────│         │──────────────│         │─────────────│
-│ id (PK)     │         │ id (PK)      │         │ id (PK)     │
-│ username    │         │ full_name    │         │ room_number │
-│ email       │         │ email        │         │ floor       │
-│ password    │         │ phone        │         │ room_type   │
-│ full_name   │         │ address      │         │ capacity    │
-│ is_admin    │         │ id_proof     │         │ rent_amount │
-│ is_active   │         │ is_active    │         │ is_available│
-└─────────────┘         └──────┬───────┘         └──────┬──────┘
-                                │                        │
-                                │                        │
-                         ┌──────┴────────┐              │
-                         │   Booking     │◄─────────────┘
-                         │───────────────│
-                         │ id (PK)       │
-                         │ tenant_id (FK)│
-                         │ room_id (FK)  │
-                         │ check_in_date │
-                         │ check_out_date│
-                         │ monthly_rent  │
-                         │ status        │
-                         └──────┬────────┘
-                                │
-                                │
-                         ┌──────┴────────┐
-                         │   Payment     │
-                         │───────────────│
-                         │ id (PK)       │
-                         │ booking_id(FK)│
-                         │ amount        │
-                         │ payment_date  │
-                         │ payment_method│
-                         │ status        │
-                         └───────────────┘
+**Characteristics**:
+- No dependencies on external frameworks
+- Contains business rules and validation
+- Framework-agnostic
+
+**Example**: `UserEntity` - represents a user in the domain
+
+```python
+class UserEntity:
+    def __init__(self, username, email, role="user", ...):
+        self.role = role  # 'admin' or 'user'
+    
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"
 ```
 
-### 4.2 Tables Description
+### 5.2 Repository Interfaces (`app/repositories/interfaces/`)
+**Purpose**: Define contracts for data access (Recipe Card)
 
-#### 4.2.1 Users Table
-- **Purpose**: Store admin/staff user accounts
-- **Key Fields**: username, email, hashed_password, is_admin
-- **Relationships**: None (standalone)
+**Characteristics**:
+- Abstract base classes (ABC)
+- Define what operations are available
+- No implementation details
 
-#### 4.2.2 Rooms Table
-- **Purpose**: Store room information and availability
-- **Key Fields**: room_number (unique), floor, room_type, capacity, rent_amount
-- **Relationships**: One-to-Many with Bookings
+**Example**: `IUserRepository` - defines methods like `create()`, `get_by_id()`, etc.
 
-#### 4.2.3 Tenants Table
-- **Purpose**: Store tenant/potential tenant information
-- **Key Fields**: email (unique), phone, full_name, id_proof
-- **Relationships**: One-to-Many with Bookings
+### 5.3 Repository Implementations (`app/repositories/`)
+**Purpose**: Concrete implementations of repository interfaces (Kitchen Equipment)
 
-#### 4.2.4 Bookings Table
-- **Purpose**: Track room bookings and occupancy
-- **Key Fields**: tenant_id (FK), room_id (FK), check_in_date, status
-- **Relationships**: 
-  - Many-to-One with Tenant
-  - Many-to-One with Room
-  - One-to-Many with Payments
+**Characteristics**:
+- Implements the interface contract
+- Handles database-specific logic
+- Converts between domain entities and database models
 
-#### 4.2.5 Payments Table
-- **Purpose**: Track all payment transactions
-- **Key Fields**: booking_id (FK), amount, payment_date, payment_method, status
-- **Relationships**: Many-to-One with Booking
+**Example**: `UserRepository` - SQLAlchemy implementation
+
+### 5.4 Use Cases (`app/usecases/`)
+**Purpose**: Application-specific business logic (Chef)
+
+**Characteristics**:
+- Orchestrates entities and repositories
+- Implements application rules
+- One use case per business operation
+
+**Examples**:
+- `RegisterUserUseCase` - handles user registration
+- `LoginUseCase` - handles user authentication
+- `GetUserUseCase` - retrieves user information
+
+### 5.5 Handlers (`app/handlers/`)
+**Purpose**: HTTP request/response handling (Waiter)
+
+**Characteristics**:
+- FastAPI route handlers
+- Validates requests using Pydantic schemas
+- Calls appropriate use cases
+- Converts entities to response schemas
+
+**Example**: `auth_handler.py` - authentication endpoints
+
+### 5.6 Models (`app/models/`)
+**Purpose**: SQLAlchemy ORM models for database persistence
+
+**Characteristics**:
+- Database-specific
+- Used only by repository implementations
+- Not exposed to use cases or handlers
+
+### 5.7 Schemas (`app/schemas/`)
+**Purpose**: Request/response validation with Pydantic
+
+**Characteristics**:
+- Used for API input/output validation
+- Separate from domain entities
+- Framework-specific (Pydantic)
 
 ---
 
-## 5. API Design
+## 6. Database Schema Design
 
-### 5.1 API Structure
+### 6.1 Users Table
+
+```sql
+CREATE TABLE users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL,
+    full_name VARCHAR(100),
+    role VARCHAR(20) NOT NULL DEFAULT 'user',  -- 'admin' or 'user'
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+**Key Fields**:
+- `role`: 'admin' or 'user' (determines permissions)
+- `is_admin`: Computed property (returns `role == "admin"`)
+
+---
+
+## 7. API Design
+
+### 7.1 API Structure
 - **Base URL**: `/api`
-- **Versioning**: Not implemented initially (can add `/v1` later)
 - **Authentication**: JWT Bearer tokens
 - **Response Format**: JSON
 
-### 5.2 Endpoint Groups
+### 7.2 Authentication Endpoints (`/api/auth`)
 
-#### 5.2.1 Authentication (`/api/auth`)
-- `POST /api/auth/register` - Register new admin user
-- `POST /api/auth/login` - Login and get JWT token
-- `POST /api/auth/refresh` - Refresh access token
-- `GET /api/auth/me` - Get current user info
-- `POST /api/auth/logout` - Logout (token blacklisting)
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/auth/register` | Register new user (with role) | No |
+| POST | `/api/auth/login` | Login and get JWT token | No |
+| GET | `/api/auth/me` | Get current user info | Yes |
+| GET | `/api/auth/users` | Get all users | Yes (Admin) |
+| GET | `/api/auth/users/{user_id}` | Get specific user | Yes |
 
-#### 5.2.2 Rooms (`/api/rooms`)
-- `GET /api/rooms` - List all rooms (with filters: available, floor, type)
-- `GET /api/rooms/{room_id}` - Get room details
-- `POST /api/rooms` - Create new room (admin only)
-- `PUT /api/rooms/{room_id}` - Update room (admin only)
-- `DELETE /api/rooms/{room_id}` - Delete room (admin only)
-- `GET /api/rooms/available` - Get available rooms
-- `GET /api/rooms/{room_id}/occupancy` - Get room occupancy history
+### 7.3 Request/Response Examples
 
-#### 5.2.3 Tenants (`/api/tenants`)
-- `GET /api/tenants` - List all tenants (with pagination, filters)
-- `GET /api/tenants/{tenant_id}` - Get tenant details
-- `POST /api/tenants` - Create new tenant
-- `PUT /api/tenants/{tenant_id}` - Update tenant
-- `DELETE /api/tenants/{tenant_id}` - Delete tenant (soft delete)
-- `GET /api/tenants/{tenant_id}/bookings` - Get tenant's booking history
+#### Register User
+**Request:**
+```json
+POST /api/auth/register
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "password": "john123",
+  "full_name": "John Doe",
+  "role": "user"  // or "admin"
+}
+```
 
-#### 5.2.4 Bookings (`/api/bookings`)
-- `GET /api/bookings` - List all bookings (with filters: status, date range)
-- `GET /api/bookings/{booking_id}` - Get booking details
-- `POST /api/bookings` - Create new booking
-- `PUT /api/bookings/{booking_id}` - Update booking (check-out, status change)
-- `DELETE /api/bookings/{booking_id}` - Cancel booking
-- `POST /api/bookings/{booking_id}/checkout` - Check-out tenant
-- `GET /api/bookings/active` - Get all active bookings
+**Response:**
+```json
+{
+  "id": 1,
+  "username": "john_doe",
+  "email": "john@example.com",
+  "full_name": "John Doe",
+  "role": "user",
+  "is_active": true,
+  "created_at": "2026-01-13T12:00:00",
+  "updated_at": null
+}
+```
 
-#### 5.2.5 Payments (`/api/payments`)
-- `GET /api/payments` - List all payments (with filters: booking, date range)
-- `GET /api/payments/{payment_id}` - Get payment details
-- `POST /api/payments` - Record new payment
-- `PUT /api/payments/{payment_id}` - Update payment (status, refund)
-- `GET /api/payments/booking/{booking_id}` - Get payments for a booking
-- `GET /api/payments/reports` - Payment reports (monthly, yearly)
+#### Login
+**Request:**
+```json
+POST /api/auth/login
+{
+  "username": "john_doe",
+  "password": "john123"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
 
 ---
 
-## 6. Authentication & Authorization
+## 8. Data Flow
 
-### 6.1 Authentication Flow
+### 8.1 Request Flow Example: User Registration
+
+```
+1. Client Request
+   POST /api/auth/register
+   ↓
+2. Handler (auth_handler.py)
+   - Validates request schema (UserCreate)
+   - Gets repository dependency
+   ↓
+3. UseCase (RegisterUserUseCase)
+   - Validates business rules (username/email uniqueness)
+   - Creates UserEntity with role
+   ↓
+4. Repository (UserRepository)
+   - Converts UserEntity → User (model)
+   - Saves to MySQL database
+   - Converts User → UserEntity
+   ↓
+5. UseCase Returns UserEntity
+   ↓
+6. Handler Converts to UserResponse (schema)
+   ↓
+7. Client Receives JSON Response
+```
+
+### 8.2 Dependency Direction
+
+```
+Handler → UseCase → Interface ← Repository
+                ↓
+            Entity
+```
+
+- Handlers depend on UseCases
+- UseCases depend on Interfaces (not implementations!)
+- Repositories implement Interfaces
+- Entities are independent
+
+---
+
+## 9. Authentication & Authorization
+
+### 9.1 Authentication Flow
 1. User registers/logs in with username and password
 2. Server validates credentials
 3. Server generates JWT access token (expires in 30 minutes)
 4. Client includes token in `Authorization: Bearer <token>` header
 5. Server validates token on each protected request
 
-### 6.2 Authorization Levels
-- **Admin**: Full access to all endpoints
-- **Staff**: Read access to most endpoints, limited write access
-- **Public**: Only login/register endpoints
+### 9.2 Authorization Levels
+- **Admin** (role="admin"): Full access to all endpoints
+- **User** (role="user"): Limited access, can view own profile
 
-### 6.3 Security Measures
+### 9.3 Security Measures
 - Password hashing with bcrypt
 - JWT tokens with expiration
 - CORS configuration
@@ -263,65 +384,25 @@ pg_management_backend/
 
 ---
 
-## 7. Data Flow
+## 10. Key Business Rules
 
-### 7.1 Request Flow
-```
-Client Request
-    ↓
-FastAPI Router (routers/)
-    ↓
-Authentication Middleware (verify JWT)
-    ↓
-Authorization Check (verify permissions)
-    ↓
-Service Layer (services/) - Business Logic
-    ↓
-Database Layer (models/) - SQLAlchemy ORM
-    ↓
-Database (PostgreSQL)
-    ↓
-Response (Pydantic Schema validation)
-    ↓
-Client Response
-```
+### 10.1 User Management
+- Username must be unique
+- Email must be unique
+- Role must be either "admin" or "user"
+- Default role is "user"
+- Password minimum length: 6 characters
 
-### 7.2 Example: Creating a Booking
-1. Client sends `POST /api/bookings` with booking data
-2. Router validates request schema
-3. Auth middleware verifies JWT token
-4. Booking service:
-   - Validates room availability
-   - Checks tenant exists
-   - Creates booking record
-   - Updates room occupancy
-5. Returns booking details
+### 10.2 Role-Based Access
+- Only users with `role="admin"` can access admin endpoints
+- Regular users can only view their own profile
+- `is_admin` is computed from `role` for backward compatibility
 
 ---
 
-## 8. Key Business Rules
+## 11. Error Handling
 
-### 8.1 Room Management
-- Room capacity cannot be exceeded
-- Room availability updated automatically on booking/checkout
-- Cannot delete room with active bookings
-
-### 8.2 Booking Management
-- Only one active booking per tenant at a time (optional rule)
-- Check-in date must be >= today
-- Check-out date must be > check-in date
-- Cannot book unavailable rooms
-
-### 8.3 Payment Management
-- Payments linked to bookings
-- Payment amount validation
-- Payment status tracking (pending, completed, failed, refunded)
-
----
-
-## 9. Error Handling
-
-### 9.1 HTTP Status Codes
+### 11.1 HTTP Status Codes
 - `200 OK` - Successful GET, PUT, DELETE
 - `201 Created` - Successful POST
 - `400 Bad Request` - Validation errors
@@ -331,81 +412,79 @@ Client Response
 - `422 Unprocessable Entity` - Pydantic validation errors
 - `500 Internal Server Error` - Server errors
 
-### 9.2 Error Response Format
+### 11.2 Error Response Format
 ```json
 {
   "detail": "Error message",
   "error_code": "ERROR_CODE",
-  "field": "field_name" // if validation error
+  "field": "field_name"  // if validation error
 }
 ```
 
 ---
 
-## 10. Development Workflow
+## 12. Configuration
 
-### 10.1 Setup Steps
+### 12.1 Environment Variables (.env)
+```env
+# Database Configuration (MySQL)
+DATABASE_URL=mysql+pymysql://root:password@localhost:3306/pg_management_db
+
+# JWT Configuration
+SECRET_KEY=your-secret-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+DEBUG=True
+```
+
+---
+
+## 13. Development Workflow
+
+### 13.1 Setup Steps
 1. Create virtual environment
-2. Install dependencies from `requirements.txt`
-3. Set up PostgreSQL database
+2. Install dependencies: `pip install -r requirements.txt`
+3. Set up MySQL database
 4. Configure `.env` file
-5. Run Alembic migrations
-6. Start development server
+5. Run application: `python run.py`
 
-### 10.2 Database Migrations
+### 13.2 Database Migrations
 - Use Alembic for schema changes
 - Create migration: `alembic revision --autogenerate -m "description"`
 - Apply migration: `alembic upgrade head`
-- Rollback: `alembic downgrade -1`
-
-### 10.3 Testing Strategy
-- Unit tests for services
-- Integration tests for API endpoints
-- Use pytest framework
-- Mock database for unit tests
 
 ---
 
-## 11. Future Enhancements
+## 14. Adding a New Feature
 
-### 11.1 Phase 2 Features
-- Email notifications (booking confirmations, payment reminders)
-- SMS notifications
-- Document upload (ID proofs, contracts)
-- Advanced reporting and analytics
-- Multi-PG support (if managing multiple properties)
-- Mobile app API support
+When adding a new feature (e.g., Room Management):
 
-### 11.2 Technical Improvements
-- Redis for caching
-- Celery for background tasks
-- WebSocket for real-time updates
-- API rate limiting
-- Request logging and monitoring
-- Docker containerization
-- CI/CD pipeline
+1. **Create Entity**: `app/entities/room.py`
+2. **Create Repository Interface**: `app/repositories/interfaces/room_repository_interface.py`
+3. **Create Repository Implementation**: `app/repositories/room_repository.py`
+4. **Create Use Cases**: `app/usecases/room_usecase.py`
+5. **Create Handler**: `app/handlers/room_handler.py`
+6. **Create Model**: `app/models/room.py`
+7. **Create Schemas**: `app/schemas/room.py`
+8. **Register Handler**: Add to `app/main.py`
 
 ---
 
-## 12. Configuration Management
+## 15. Benefits of This Architecture
 
-### 12.1 Environment Variables
-- `DATABASE_URL` - Database connection string
-- `SECRET_KEY` - JWT secret key
-- `ALGORITHM` - JWT algorithm (HS256)
-- `ACCESS_TOKEN_EXPIRE_MINUTES` - Token expiration time
-- `HOST` - Server host
-- `PORT` - Server port
-- `DEBUG` - Debug mode flag
-
-### 12.2 Configuration Loading
-- Use `pydantic-settings` for type-safe configuration
-- Load from `.env` file
-- Validate on application startup
+1. **Testability**: Each layer can be tested independently
+2. **Maintainability**: Clear separation of concerns
+3. **Flexibility**: Easy to swap implementations (e.g., change database)
+4. **Independence**: Business logic doesn't depend on frameworks
+5. **Scalability**: Easy to add new features following the same pattern
 
 ---
 
-## 13. API Documentation
+## 16. API Documentation
 
 - **Swagger UI**: Automatically generated at `/docs`
 - **ReDoc**: Alternative docs at `/redoc`
@@ -413,40 +492,22 @@ Client Response
 
 ---
 
-## 14. Deployment Considerations
+## 17. Current Implementation Status
 
-### 14.1 Production Checklist
-- [ ] Set `DEBUG=False`
-- [ ] Use strong `SECRET_KEY`
-- [ ] Configure proper CORS origins
-- [ ] Set up database connection pooling
-- [ ] Enable HTTPS
-- [ ] Set up logging
-- [ ] Configure backup strategy
-- [ ] Set up monitoring
+### ✅ Implemented
+- User Management with role-based access
+- JWT Authentication
+- Clean Architecture pattern
+- MySQL database integration
+- API documentation (Swagger)
 
-### 14.2 Recommended Deployment
-- **Platform**: AWS, GCP, Azure, or DigitalOcean
-- **Server**: Linux (Ubuntu)
-- **Process Manager**: systemd or supervisor
-- **Reverse Proxy**: Nginx
-- **Database**: Managed PostgreSQL service
+### 🚧 To Be Implemented
+- Room Management
+- Tenant Management
+- Booking Management
+- Payment Management
+- Reporting
 
 ---
 
-## 15. Questions for Discussion
-
-Before implementation, consider:
-
-1. **Multi-tenancy**: Do we need to support multiple PG properties?
-2. **User Roles**: Do we need more granular roles (owner, manager, staff)?
-3. **Booking Rules**: Can a tenant have multiple active bookings?
-4. **Payment Integration**: Do we need payment gateway integration (Razorpay, Stripe)?
-5. **Notifications**: Email/SMS requirements?
-6. **Reporting**: What specific reports are needed?
-7. **Data Retention**: How long to keep historical data?
-
----
-
-This architecture document serves as a blueprint for the PG Management System backend. Review and discuss any changes before proceeding with implementation.
-
+This architecture document reflects the current implementation using Clean Architecture, MySQL database, and role-based user system.
